@@ -1,0 +1,87 @@
+openapi: 3.0.0
+info:
+  description: playground
+  version: 1.0.0
+  title: playground
+servers:
+- url: /playground-api
+security:
+- basic: [
+    ]
+tags:
+- name: mail
+paths:
+  /mail:
+    get:
+      description: retrieves all mails
+      tags:
+      - mail
+      operationId: getMails
+      parameters:
+      - name: sender
+        in: query
+        description: sender of the mail
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful response, with a representation of all mails
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/mail'
+        500:
+          $ref: '#/components/responses/Error'
+    post:
+      description: send a new mail
+      tags:
+      - mail
+      operationId: sendMail
+      responses:
+        200:
+          description: ok
+        500:
+          $ref: '#/components/responses/Error'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/mail'
+        description: new mail
+        required: true
+components:
+  responses:
+    Error:
+      description: internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+  securitySchemes:
+    basic:
+      type: http
+      scheme: basic
+  schemas:
+    mail:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          readOnly: true
+        sender:
+          type: string
+        subject:
+          type: string
+    error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: string

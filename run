@@ -1,0 +1,5 @@
+#!/bin/sh
+mvn clean package -DskipTests
+java -jar target/playground-mail.jar $@
+
+# curl -v -X POST http://localhost:8080/playground-api/mail -H 'Content-Type: application/json' --data '{"sender":"test@local", "subject":"test"}'
