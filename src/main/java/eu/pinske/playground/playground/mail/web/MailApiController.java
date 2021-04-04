@@ -1,15 +1,14 @@
 package eu.pinske.playground.playground.mail.web;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import eu.pinske.playground.playground.mail.service.MailService;
 import eu.pinske.playground.web.api.MailApi;
 import eu.pinske.playground.web.api.model.MailDto;
 
@@ -17,29 +16,24 @@ import eu.pinske.playground.web.api.model.MailDto;
 @RequestMapping("/playground-api")
 public class MailApiController implements MailApi {
 
-
 	@Autowired
-	private JavaMailSender mailSender;
-	
+	private MailService mailService;
+
 	@Override
 	public ResponseEntity<List<MailDto>> getMails(String sender) {
-		// TODO Auto-generated method stub
-		return null;
+		List<String> mails = mailService.getMails();
+		List<MailDto> mailDtos = new ArrayList<>(mails.size());
+		for (String mail : mails) {
+			MailDto mailDto = new MailDto();
+			mailDto.setSubject(mail);
+			mailDtos.add(mailDto);
+		}
+		return ResponseEntity.ok(mailDtos);
 	}
-	
+
 	@Override
 	public ResponseEntity<Void> sendMail(MailDto mailDto) {
-		try {
-			MimeMessageHelper mail = new MimeMessageHelper(mailSender.createMimeMessage(), true);
-			mail.setFrom(mailDto.getSender());
-			mail.setTo("test@local");
-			mail.setSubject(mailDto.getSubject());
-			mail.setText("Hello!");
-			//mail.addAttachment("data.bin", new InputStreamDataSource(data.get()));
-			mailSender.send(mail.getMimeMessage());
-		} catch (Exception e) {
-			return ExceptionUtils.rethrow(e);
-		}
+		mailService.sendMail(mailDto.getSender(), "test@local", mailDto.getSubject(), "Hello!");
 		return ResponseEntity.ok().build();
 	}
 }

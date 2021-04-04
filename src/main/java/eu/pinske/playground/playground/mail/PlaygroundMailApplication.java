@@ -1,17 +1,14 @@
 package eu.pinske.playground.playground.mail;
 
-import java.awt.GraphicsEnvironment;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.Properties;
 
 import javax.mail.Authenticator;
 import javax.mail.PasswordAuthentication;
-import javax.mail.internet.MimeMessage;
+import javax.mail.Session;
 import javax.swing.JFrame;
 
 import org.apache.james.mime4j.message.DefaultMessageBuilder;
@@ -19,22 +16,32 @@ import org.apache.james.mime4j.samples.tree.MessageTree;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.mail.MailProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.IntegrationFlows;
-import org.springframework.integration.handler.GenericHandler;
 import org.springframework.integration.mail.dsl.Mail;
-import org.springframework.messaging.MessageHeaders;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import com.icegreen.greenmail.spring.GreenMailBean;
 
 @SpringBootApplication
+@EnableConfigurationProperties(MailProperties.class)
 public class PlaygroundMailApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(PlaygroundMailApplication.class, args);
+	public static void main(String[] args) throws Exception {
+		if (args.length == 2 && "show".equals(args[0])) {
+			visualizeMessage(new FileInputStream(args[1]));
+		} else {
+			SpringApplication.run(PlaygroundMailApplication.class, args);
+		}
 	}
-	
+
 	@Bean
 	public GreenMailBean greenMail() {
 		GreenMailBean mail = new GreenMailBean();
@@ -45,38 +52,47 @@ public class PlaygroundMailApplication {
 	}
 
 	@Bean
-	public IntegrationFlow mailFlow(MailProperties props) {
-		return IntegrationFlows.from(Mail.imapIdleAdapter("imap:INBOX").cancelIdleInterval(29 * 60)
-				.javaMailProperties(asProperties(props.getProperties())).javaMailAuthenticator(new Authenticator() {
-					@Override
-					protected PasswordAuthentication getPasswordAuthentication() {
-						return new PasswordAuthentication(props.getUsername(), props.getPassword());
-					}
-				})).handle(new GenericHandler<MimeMessage>() {
-					@Override
-					public Object handle(MimeMessage payload, MessageHeaders headers) {
-						try {
-							payload.writeTo(System.out);
-							if (!GraphicsEnvironment.isHeadless()) {
-								ByteArrayOutputStream baos = new ByteArrayOutputStream();
-								payload.writeTo(baos);
-								visualizeMessage(new ByteArrayInputStream(baos.toByteArray()));
-							}
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-						return null;
-					}
-				}).get();
+	public TaskExecutor taskExecutor() {
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+		executor.setCorePoolSize(20);
+		return executor;
 	}
 
-	private Properties asProperties(Map<String, String> source) {
+	@Bean
+	public TaskScheduler taskScheduler() {
+		ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+		scheduler.setPoolSize(5);
+		return scheduler;
+	}
+
+	@Bean
+	public Session mailSession(MailProperties props, TaskExecutor taskExecutor) {
 		Properties properties = new Properties();
-		properties.putAll(source);
-		return properties;
+		properties.putAll(props.getProperties());
+		properties.put("mail.event.executor", taskExecutor);
+		Session session = Session.getInstance(properties, new Authenticator() {
+			@Override
+			protected PasswordAuthentication getPasswordAuthentication() {
+				return new PasswordAuthentication(props.getUsername(), props.getPassword());
+			}
+		});
+		return session;
 	}
 
-	private void visualizeMessage(InputStream messageStream) throws IOException {
+	@Bean
+	public JavaMailSender mailSender(Session mailSession) {
+		JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+		mailSender.setSession(mailSession);
+		return mailSender;
+	}
+
+	@Bean
+	public IntegrationFlow mailFlow(Session mailSession, TaskExecutor taskExecutor) {
+		return IntegrationFlows.from(Mail.imapIdleAdapter("imap:INBOX").session(mailSession).cancelIdleInterval(29 * 60)
+				.sendingTaskExecutor(taskExecutor)).handle("mailService", "handleMessage").get();
+	}
+
+	private static void visualizeMessage(InputStream messageStream) throws IOException {
 		org.apache.james.mime4j.dom.Message message = new DefaultMessageBuilder().parseMessage(messageStream);
 		javax.swing.SwingUtilities.invokeLater(() -> {
 			MessageTree messageTree = new MessageTree(message);
