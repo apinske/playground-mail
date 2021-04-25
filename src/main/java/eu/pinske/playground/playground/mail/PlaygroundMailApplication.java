@@ -13,6 +13,7 @@ import javax.swing.JFrame;
 
 import org.apache.james.mime4j.message.DefaultMessageBuilder;
 import org.apache.james.mime4j.samples.tree.MessageTree;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.mail.MailProperties;
@@ -21,6 +22,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.IntegrationFlows;
+import org.springframework.integration.mail.ImapMailReceiver;
+import org.springframework.integration.mail.dsl.ImapIdleChannelAdapterSpec;
 import org.springframework.integration.mail.dsl.Mail;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -43,11 +46,11 @@ public class PlaygroundMailApplication {
 	}
 
 	@Bean
-	public GreenMailBean greenMail() {
+	public GreenMailBean greenMail(@Value("${greenmail.users}") String[] users) {
 		GreenMailBean mail = new GreenMailBean();
 		mail.setImapProtocol(true);
-		mail.setPop3Protocol(true);
-		mail.setUsers(Arrays.asList("test:test@local"));
+		mail.setPop3Protocol(false);
+		mail.setUsers(Arrays.asList(users));
 		return mail;
 	}
 
@@ -73,7 +76,8 @@ public class PlaygroundMailApplication {
 		Session session = Session.getInstance(properties, new Authenticator() {
 			@Override
 			protected PasswordAuthentication getPasswordAuthentication() {
-				return new PasswordAuthentication(props.getUsername(), props.getPassword());
+				return new PasswordAuthentication(getDefaultUserName(),
+						properties.getProperty("mail." + getRequestingProtocol() + ".password"));
 			}
 		});
 		return session;
@@ -87,9 +91,15 @@ public class PlaygroundMailApplication {
 	}
 
 	@Bean
-	public IntegrationFlow mailFlow(Session mailSession, TaskExecutor taskExecutor) {
-		return IntegrationFlows.from(Mail.imapIdleAdapter("imap:INBOX").session(mailSession).cancelIdleInterval(29 * 60)
-				.sendingTaskExecutor(taskExecutor)).handle("mailService", "handleMessage").get();
+	public IntegrationFlow mailFlow(Session mailSession, TaskExecutor taskExecutor, @Value("${mail.url}") String url) {
+		ImapMailReceiver mailReceiver = new ImapMailReceiver(url);
+		mailReceiver.setSession(mailSession);
+		mailReceiver.setSimpleContent(true);
+		mailReceiver.setShouldDeleteMessages(false);
+		mailReceiver.setCancelIdleInterval(29 * 60);
+		mailReceiver.setUserFlag("PLGR");
+		ImapIdleChannelAdapterSpec mailChannel = Mail.imapIdleAdapter(mailReceiver).sendingTaskExecutor(taskExecutor);
+		return IntegrationFlows.from(mailChannel).handle("mailService", "handleMessage").get();
 	}
 
 	private static void visualizeMessage(InputStream messageStream) throws IOException {

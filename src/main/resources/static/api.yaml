@@ -74,6 +74,8 @@ components:
           readOnly: true
         sender:
           type: string
+        recipient:
+          type: string
         subject:
           type: string
     error:

@@ -33,7 +33,7 @@ public class MailApiController implements MailApi {
 
 	@Override
 	public ResponseEntity<Void> sendMail(MailDto mailDto) {
-		mailService.sendMail(mailDto.getSender(), "test@local", mailDto.getSubject(), "Hello!");
+		mailService.sendMail(mailDto.getSender(), mailDto.getRecipient(), mailDto.getSubject(), "Hello!");
 		return ResponseEntity.ok().build();
 	}
 }
