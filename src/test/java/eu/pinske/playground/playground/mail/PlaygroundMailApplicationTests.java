@@ -24,12 +24,6 @@ class PlaygroundMailApplicationTests {
 	@Test
 	void contextLoads(@Autowired WebApplicationContext ctx, @Autowired Session mailSession) throws Exception {
 		MockMvc mvc = webAppContextSetup(ctx).build();
-		logger.info("waiting...");
-		// TODO Race between
-		// org.springframework.integration.mail.ImapMailReceiver.SimpleMessageCountListener.messagesAdded
-		// and com.sun.mail.imap.IMAPFolder.keepConnectionAlive because
-		// protocol.getTimestamp() is "too young"
-		Thread.sleep(1000);
 		logger.info("sending mail...");
 		mvc.perform(post("/playground-api/mail").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"sender\":\"test@local\",\"subject\":\"test\"}")).andExpect(status().isOk());
