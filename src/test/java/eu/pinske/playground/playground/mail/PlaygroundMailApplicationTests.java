@@ -21,7 +21,9 @@ import com.icegreen.greenmail.mail.MailAddress;
 import com.icegreen.greenmail.mail.MovingMessage;
 import com.icegreen.greenmail.spring.GreenMailBean;
 import com.icegreen.greenmail.user.GreenMailUser;
-import com.icegreen.greenmail.user.UndeliverableHandler;
+import com.icegreen.greenmail.user.MessageDeliveryHandler;
+import com.icegreen.greenmail.user.UserException;
+import com.icegreen.greenmail.user.UserManager;
 import com.sun.mail.dsn.DeliveryStatus;
 import com.sun.mail.dsn.MultipartReport;
 
@@ -33,22 +35,31 @@ class PlaygroundMailApplicationTests {
 
 	@Test
 	void contextLoads(@Autowired WebApplicationContext ctx) throws Exception {
-		greenMail.getGreenMail().getManagers().getUserManager().setUndeliverableHandler(new UndeliverableHandler() {
-
+		UserManager userManager = greenMail.getGreenMail().getManagers().getUserManager();
+		userManager.setMessageDeliveryHandler(new MessageDeliveryHandler() {
 			@Override
-			public GreenMailUser handle(MovingMessage msg, MailAddress mailAddress) throws MessagingException {
-				GreenMailUser user = userManager.getUserByEmail(msg.getReturnPath().getEmail());
-				MimeMessage dsnMessage = new MimeMessage(msg.getMessage().getSession());
-				dsnMessage.setSubject("Delivery Status Report");
-				DeliveryStatus dsn = new DeliveryStatus();
-				dsn.setMessageDSN(new InternetHeaders());
-				dsn.getMessageDSN().addHeader("Reporting-MTA", "greenmail.local");
-				dsn.addRecipientDSN(new InternetHeaders());
-				dsn.getRecipientDSN(0).addHeader("Final-Recipient", mailAddress.getEmail());
-				dsn.getRecipientDSN(0).addHeader("Action", "failed");
-				dsn.getRecipientDSN(0).addHeader("Status", "5.1.1");
-				dsnMessage.setContent(new MultipartReport("", dsn, msg.getMessage()));
-				msg.setMimeMessage(dsnMessage);
+			public GreenMailUser handle(MovingMessage msg, MailAddress mailAddress)
+					throws MessagingException, UserException {
+				String email = mailAddress.getEmail();
+				GreenMailUser user = userManager.getUserByEmail(email);
+				if (user == null) {
+					user = userManager.getUserByEmail(msg.getReturnPath().getEmail());
+					if (user != null) {
+						MimeMessage dsnMessage = new MimeMessage(msg.getMessage().getSession());
+						dsnMessage.setSubject("Delivery Status Report");
+						DeliveryStatus dsn = new DeliveryStatus();
+						dsn.setMessageDSN(new InternetHeaders());
+						dsn.getMessageDSN().addHeader("Reporting-MTA", "greenmail.local");
+						dsn.addRecipientDSN(new InternetHeaders());
+						dsn.getRecipientDSN(0).addHeader("Final-Recipient", email);
+						dsn.getRecipientDSN(0).addHeader("Action", "failed");
+						dsn.getRecipientDSN(0).addHeader("Status", "5.1.1");
+						dsnMessage.setContent(new MultipartReport("", dsn, msg.getMessage()));
+						msg.setMimeMessage(dsnMessage);
+					} else {
+						user = userManager.createUser(email, email, email);
+					}
+				}
 				return user;
 			}
 		});
