@@ -51,6 +51,30 @@ paths:
               $ref: '#/components/schemas/mail'
         description: new mail
         required: true
+  /mail/{id}/report:
+    get:
+      description: retrieves the report for the mail
+      tags:
+      - mail
+      operationId: getMailReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: id of the mail
+        schema:
+          type: string
+      responses:
+        200:
+          description: successful response, with a representation of all mails
+          content:
+            message/rfc882:
+              schema:
+                type: string
+                format: binary
+        500:
+          $ref: '#/components/responses/Error'
+
 components:
   responses:
     Error:
@@ -77,6 +101,8 @@ components:
         recipient:
           type: string
         subject:
+          type: string
+        status:
           type: string
     error:
       type: object

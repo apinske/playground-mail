@@ -1,5 +1,7 @@
 #!/bin/sh
 mvn clean package -DskipTests
-java -jar target/playground-mail.jar $@
+java -Dspring.profiles.active=prod -jar target/playground-mail.jar $@
 
-# curl -v -X POST http://localhost:8080/playground-api/mail -H 'Content-Type: application/json' --data '{"sender":"sender@local", "recipient":"test2@local", "subject":"test"}'
+# curl -X POST http://localhost:8080/playground-api/mail -H 'Content-Type: application/json' --data '{"sender": "apinske_test1@online-home.de", "recipient":"wrong_address@pinske.eu", "subject":"Test_DSN_1"}'
+# curl http://localhost:8080/playground-api/mail | jq
+# for id in $(curl http://localhost:8080/playground-api/mail | jq -r .[].id); do curl http://localhost:8080/playground-api/mail/$id/report > target/$id.eml; done

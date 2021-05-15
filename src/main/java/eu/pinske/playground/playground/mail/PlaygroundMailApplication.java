@@ -51,6 +51,7 @@ public class PlaygroundMailApplication {
 		mail.setImapProtocol(true);
 		mail.setPop3Protocol(false);
 		mail.setUsers(Arrays.asList(users));
+		mail.setAutostart(users.length > 0);
 		return mail;
 	}
 
