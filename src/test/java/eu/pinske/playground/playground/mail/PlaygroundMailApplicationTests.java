@@ -32,7 +32,7 @@ class PlaygroundMailApplicationTests {
 
 	@Test
 	void contextLoads(@Autowired WebApplicationContext ctx) throws Exception {
-		UserManager userManager = greenMail.getGreenMail().getManagers().getUserManager();
+		UserManager userManager = greenMail.getUserManager();
 		userManager.setMessageDeliveryHandler((msg, mailAddress) -> {
 			String email = mailAddress.getEmail();
 			GreenMailUser user = userManager.getUserByEmail(email);
